@@ -1,33 +1,21 @@
 import { HttpError } from "./errorHandler";
 
 interface config {
-  headers: Record<string, string>;
+  headers?: Record<string, string>;
   baseUrl?: string;
   timeout?: number;
 }
 
-interface FetchData<T = string> {
+interface FetchData {
   fetchUrl: string;
   method: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
-  data?: T;
+  data?: options;
 }
 
-interface FnCallingParams<T = any> {
-  url: string;
-  payload?: T;
-}
-
-interface fetchResponse<T = any> {
-  statusCode: number;
-  message: string;
-  data: T;
-  error?: string;
-}
-
-interface ApiResponse<T = any> {
-  statusCode: number;
-  message: string;
-  data: T;
+interface options {
+  headers?: Record<string, string>;
+  getTimeInterval?: boolean;
+  payload?: any;
 }
 
 class Axios {
@@ -37,10 +25,28 @@ class Axios {
     },
     timeout: 1000,
   };
+
   constructor(config: config) {
     this.config = config;
   }
 
+  private buildFetchUrl(url: string) {
+    // todo : check for params
+    if (url.startsWith("https://") || url.startsWith("http://")) return url;
+    if (this.config.baseUrl) {
+      return `${
+        this.config.baseUrl.endsWith("/")
+          ? this.config.baseUrl.slice(0, -1)
+          : this.config.baseUrl
+      }${url.startsWith("/") ? url : "/" + url}`;
+    }
+    throw new HttpError({
+      error: "BadRequestError",
+      message: "Base url is required while making req with relative url",
+      statusCode: 400,
+      path: url,
+    });
+  }
   private async handleTimeOut(fetchData: FetchData) {
     const controller = new AbortController();
     const timeOutId = setTimeout(() => {
@@ -49,10 +55,20 @@ class Axios {
     const options: RequestInit = {
       signal: controller.signal,
       method: fetchData.method,
-      headers: this.config.headers,
+      headers: fetchData.data?.headers || {
+        "Content-Type": "application/json",
+      },
     };
-    if (fetchData.method !== "GET" || fetchData.data !== undefined) {
-      options.body = JSON.stringify(fetchData.data);
+    if (fetchData.method !== "GET") {
+      if (!fetchData.data?.payload) {
+        throw new HttpError({
+          error: "BadRequestError",
+          message: `Payload is required to ${fetchData.method} !`,
+          statusCode: 400,
+          path: fetchData.fetchUrl,
+        });
+      }
+      options.body = JSON.stringify(fetchData.data.payload);
     }
     let fetchApi;
     try {
@@ -67,124 +83,109 @@ class Axios {
           path: fetchData.fetchUrl,
         });
       } else {
-        throw err;
+        throw new HttpError({
+          error: err.name,
+          message: err.message,
+          statusCode: 500,
+          path: fetchData.fetchUrl,
+        });
       }
     } finally {
       clearTimeout(timeOutId);
     }
-    const JsonResponse: fetchResponse = await fetchApi.json();
     if (!fetchApi) {
-      throw new Error("no fetch data found");
+      throw new HttpError({
+        error: "NotFoundError",
+        message: "No response is send by the server",
+        statusCode: 404,
+        path: fetchData.fetchUrl,
+      });
+    }
+    const JsonResponse = await fetchApi.json();
+    if (!fetchApi.ok) {
+      throw new HttpError({
+        error: JsonResponse.message,
+        message: JsonResponse.message || fetchApi.type,
+        statusCode: fetchApi.status,
+        path: fetchApi.url,
+      });
     }
     return JsonResponse;
   }
 
-  async get<T = any>(url?: string): Promise<ApiResponse<T>> {
-    if (!this.config.baseUrl) {
-      throw new HttpError({
-        error: "NotFoundError",
-        message: "Base url not found",
-        statusCode: 404,
-      });
-    }
-    const fetchUrl = this.config.baseUrl + url;
+  async get(url?: string, options?: options) {
+    const fetchUrl = this.buildFetchUrl(url ?? "");
+    const startTime = performance.now();
     const fetchResponse = await this.handleTimeOut({
       fetchUrl: fetchUrl,
       method: "GET",
     });
-    if (fetchResponse.statusCode !== 200) {
-      throw new HttpError({
-        message: fetchResponse.message,
-        statusCode: fetchResponse.statusCode,
-        path: fetchUrl,
-        error: fetchResponse.error ?? "",
-      });
+    const endTime = performance.now();
+    const timeTaken = (endTime - startTime).toFixed(2);
+    if (options?.getTimeInterval) {
+      return {
+        data: fetchResponse,
+        timeTaken: `${timeTaken} ms`,
+      };
     }
     return fetchResponse;
   }
 
-  async post<T = any>({ url, payload }: FnCallingParams<any>) : Promise<ApiResponse<T>> {
-    if (!this.config.baseUrl) {
+  async post(url?: string, options?: options) {
+    const fetchUrl = this.buildFetchUrl(url ?? "");
+    if (!options || Object.keys(options).length === 0 || !options.payload) {
       throw new HttpError({
         error: "NotFoundError",
-        message: "Base url not found",
+        message: "MetaData must be passed",
         statusCode: 404,
+        path: fetchUrl,
       });
     }
-    const fetchUrl = this.config.baseUrl + url;
+    const startTime = performance.now();
     const fetchResponse = await this.handleTimeOut({
       fetchUrl: fetchUrl,
       method: "POST",
-      data: payload,
+      data: options,
     });
-    if (fetchResponse.statusCode !== 201) {
-      throw new HttpError({
-        message: fetchResponse.message,
-        statusCode: fetchResponse.statusCode,
-        path: fetchUrl,
-        error: fetchResponse.error ?? "",
-      });
+    const endTime = performance.now();
+    const timeTaken = (endTime - startTime).toFixed(2);
+    if (options.getTimeInterval) {
+      return {
+        data: fetchResponse,
+        timeTaken: `${timeTaken} ms`,
+      };
     }
     return fetchResponse;
   }
 
-  async patch<T = any>(params: FnCallingParams<any>): Promise<ApiResponse<T>> {
-    if (!this.config.baseUrl) {
+  async patch(url?: string, options?: options) {
+    const fetchUrl = this.buildFetchUrl(url ?? "");
+    if (!options || Object.keys(options).length === 0 || !options.payload) {
       throw new HttpError({
         error: "NotFoundError",
-        message: "Base url not found",
+        message: "MetaData must be passed",
         statusCode: 404,
+        path: fetchUrl,
       });
     }
-    const fetchUrl = this.config.baseUrl + params.url;
+    const startTime = performance.now();
     const fetchResponse = await this.handleTimeOut({
       fetchUrl: fetchUrl,
       method: "PATCH",
-      data: params.payload,
+      data: options,
     });
-    if (fetchResponse.statusCode !== 200) {
-      throw new HttpError({
-        message: fetchResponse.message,
-        statusCode: fetchResponse.statusCode,
-        path: fetchUrl,
-        error: fetchResponse.error ?? "",
-      });
+    const endTime = performance.now();
+    const timeTaken = (endTime - startTime).toFixed(2);
+    if (options.getTimeInterval) {
+      return {
+        data: fetchResponse,
+        timeTaken: `${timeTaken} ms`,
+      };
     }
     return fetchResponse;
   }
 
-  async delete<T = any>(params: FnCallingParams<{ Id: number }>): Promise<ApiResponse<T>> {
-    if (!this.config.baseUrl) {
-      throw new HttpError({
-        error: "NotFoundError",
-        message: "Base url not found",
-        statusCode: 404,
-      });
-    }
-    if (!params.payload) {
-      throw new HttpError({
-        error: "NotFoundError",
-        message: "Payload not found",
-        statusCode: 404,
-        path: this.config.baseUrl + params.url,
-      });
-    }
-    const fetchUrl =
-      this.config.baseUrl + params.url + "/" + Number(params.payload.Id);
-    const fetchResponse = await this.handleTimeOut({
-      fetchUrl: fetchUrl,
-      method: "DELETE",
-    });
-    if (fetchResponse.statusCode !== 200) {
-      throw new HttpError({
-        message: fetchResponse.message,
-        statusCode: fetchResponse.statusCode,
-        path: fetchUrl,
-        error: fetchResponse.error ?? "",
-      });
-    }
-    return fetchResponse;
-  }
+
 }
 
 function create(conf: config) {

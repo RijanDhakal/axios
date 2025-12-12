@@ -14,7 +14,7 @@ interface Student {
 
 const api = axios.create({
   baseUrl: "http://localhost:3000",
-  timeout: 1000,
+  timeout: 3000,
   headers: {
     "Content-Type": "application/json",
   },
@@ -22,14 +22,15 @@ const api = axios.create({
 
 const asyncFunction = async () => {
   // GET
-  // const res = await api.get<Student[]>("/students/get");
+  const res = await api.get("/students/get", {
+    getTimeInterval: true,
+  });
   // console.log("res :", res);
 
   // POST
-  // const res = await api.post<Student>({
-  //   url: "/students/create",
+  // const res = await api.post("/students/create", {
   //   payload: {
-  //     studentId: 14,
+  //     studentId: 23,
   //     name: "test",
   //     address: "sunwal",
   //     contact: "6767327832",
@@ -38,14 +39,18 @@ const asyncFunction = async () => {
   //     stream: "SCIENCE",
   //     password: "123456",
   //   },
+  //   headers: {
+  //     "Content-Type": "Application/Json",
+  //   },
+  //   getTimeInterval: true,
   // });
 
   // PATCH
-  // const res = await api.patch({
-  //   url: "/students/update/2",
-  //   payload: {
-  //     name: "updated params",
-  //   },
+  // const res = await api.patch("/students/update/2",{
+  //   getTimeInterval : true,
+  //   payload:{
+  //     name : "hahaha"
+  //   }
   // });
 
   // DELETE
@@ -55,6 +60,6 @@ const asyncFunction = async () => {
   //     studentId: 4,
   //   },
   // });
-  // console.log(res);
+  console.log(res);
 };
 asyncFunction();
