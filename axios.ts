@@ -1,6 +1,11 @@
 import { HttpError } from "./errorHandler";
 
-type HttpHeader = Record<string, string> | Headers;
+type CommonHeaders = {
+  Authorization?: string;
+  "Content-Type"?: string;
+  Accept?: string;
+};
+type HttpHeader = Record<string, string> & CommonHeaders;
 
 enum Methods {
   GET = "GET",
@@ -50,6 +55,8 @@ interface fetchTimoutResponse<T> {
   response: Response;
   config: requestConfig;
 }
+
+type getOptions = Omit<options, "headers" | "payload">;
 
 class Axios {
   config: config = {
@@ -106,9 +113,15 @@ class Axios {
     endTime: number;
     options?: options;
   }) {
+    // Convert Headers to plain object
+    const headersObj: HttpHeader = {};
+    fetchResponse.response.headers.forEach((value, key) => {
+      headersObj[key] = value;
+    });
+
     const response: ApiResponse<T> = {
       data: fetchResponse.data,
-      headers: fetchResponse.response.headers,
+      headers: headersObj,
       statusCode: fetchResponse.response.status,
     };
     if (options?.getTimeInterval) {
@@ -128,6 +141,8 @@ class Axios {
     const options: RequestInit = {
       signal: controller.signal,
       method: fetchData.method,
+      // the default headers ius for the GET req beacuse we donot accpet options for get here
+      // beacuse we dont expect body or external headers to be passed with get
       headers: fetchData.data?.headers || {
         "Content-Type": "application/json",
       },
@@ -192,13 +207,13 @@ class Axios {
       config: {
         url: fetchData.fetchUrl,
         method: fetchData.method,
-        requestHeaders: fetchData.data?.headers,
+        requestHeaders: options.headers,
       } as requestConfig,
     };
     return res;
   }
 
-  async get<T = any>(url: string, options?: options) {
+  async get<T = any>(url: string, options?: getOptions) {
     const fetchUrl = this.buildFetchUrl(url);
     const startTime = performance.now();
     const fetchResponse = await this.handleTimeOut<T>({

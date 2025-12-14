@@ -30,30 +30,27 @@ const asyncFunction = async () => {
   // GET
   // const res = await api.get<ApiResponse<Student[]>>("/students/get", {
   //   getTimeInterval: true,
-  //   headers: {
-  //     "content-type": "application/json",
-  //   },
   //   config: true,
   // });
 
   // POST
-  // const res = await api.post("/students/create", {
-  //   payload: {
-  //     studentId: 28,
-  //     name: "test",
-  //     address: "sunwal",
-  //     contact: "6767327832",
-  //     grade: 12,
-  //     section: 106,
-  //     stream: "SCIENCE",
-  //     password: "123456",
-  //   },
-  //   headers: {
-  //     "content-type": "application/json",
-  //   },
-  //   getTimeInterval: true,
-  //   config: true,
-  // });
+  const res = await api.post("/students/create", {
+    payload: {
+      studentId: 27,
+      name: "test",
+      address: "sunwal",
+      contact: "6767327832",
+      grade: 12,
+      section: 106,
+      stream: "SCIENCE",
+      password: "123456",
+    },
+    headers: {
+      "content-type": "application/json",
+    },
+    getTimeInterval: true,
+    config: true,
+  });
 
   // PATCH
   // const res = await api.patch<ApiResponse<Student>>("/students/update/2", {
@@ -65,7 +62,7 @@ const asyncFunction = async () => {
   // });
 
   // DELETE
-  const res = await api.delete<ApiResponse<[]>>("/students/delete/24");
+  // const res = await api.delete<ApiResponse<[]>>("/students/delete/24");
   console.log(res);
 };
 asyncFunction();
